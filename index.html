@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 3A · Crypto-Shredding</title>
+<style>
+:root{
+  --navy:#14213D; --navy-2:#22304F; --teal:#1F7A6D; --teal-soft:#E3EEEA; --cream:#F5F4EF;
+  --card:#FDFCF8; --line:#E3E1DA; --ink:#14213D; --body:#3F4A5C; --muted:#5F6673;
+  --amber:#9A5B12; --amber-soft:#F8EBD8; --red:#A33224; --red-soft:#F8E1DC; --gray:#6B7078; --gray-soft:#ECEBE6;
+  --mono:Consolas,"Cascadia Mono","Courier New",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--cream);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+button,input,textarea{font:inherit;color:inherit}
+header{background:var(--navy);color:#F5F4EF;padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+header .brand{font-weight:700;letter-spacing:.3px;font-size:17px}
+header .brand span{color:#E8A04C;font-weight:600;letter-spacing:2px;text-transform:uppercase;font-size:12px;margin-right:10px}
+header .who{margin-left:auto;font-size:14px;color:#C5CFDD}
+.app{display:grid;grid-template-columns:220px minmax(0,1fr) minmax(0,1.05fr);gap:20px;padding:20px 24px;align-items:start}
+nav{position:sticky;top:12px;display:flex;flex-direction:column;gap:4px}
+nav button{display:flex;align-items:center;gap:10px;text-align:left;border:1px solid transparent;background:none;padding:8px 10px;border-radius:10px;cursor:pointer;color:var(--body)}
+nav button:hover{background:var(--card);border-color:var(--line)}
+nav button.active{background:var(--card);border-color:var(--teal);color:var(--ink);font-weight:600}
+nav .dot{width:12px;height:12px;border-radius:50%;border:2px solid #B9BCC2;flex:none}
+nav .dot.started{border-color:var(--teal);background:var(--teal-soft)}
+nav .dot.done{border-color:var(--teal);background:var(--teal)}
+nav .group{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin:12px 10px 2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--teal)}
+h1{font-size:28px;line-height:1.15;margin:4px 0 8px}
+h2{font-size:18px;margin:0 0 8px;display:flex;align-items:center;gap:10px}
+.pill{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:999px}
+.pill.predict{background:var(--navy);color:#F5F4EF}
+.pill.run{background:var(--teal);color:#F5F4EF}
+.pill.explain{background:#F3DDBD;color:var(--navy)}
+p{margin:0 0 8px;color:var(--body)}
+.q{font-weight:600;color:var(--ink);margin:10px 0 6px}
+textarea{width:100%;min-height:86px;resize:vertical;border:1px solid #CFCCC3;border-radius:10px;padding:10px 12px;background:#fff;line-height:1.45}
+textarea:focus,input:focus{outline:2px solid var(--teal);outline-offset:1px}
+textarea:disabled{background:var(--gray-soft);color:var(--muted)}
+.hint{font-size:13px;color:var(--muted);margin-top:6px}
+.locked{font-size:13px;color:var(--teal);font-weight:600;margin-top:6px}
+.actions{display:flex;flex-direction:column;gap:8px}
+.act{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff}
+.act .n{width:26px;height:26px;border-radius:50%;background:var(--gray-soft);color:var(--muted);display:grid;place-items:center;font-size:13px;font-weight:700;flex:none}
+.act.done .n{background:var(--teal);color:#fff}
+.act .lbl{flex:1;min-width:0}
+.act code{display:block;font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.btn{border:none;border-radius:9px;padding:8px 16px;font-weight:600;cursor:pointer;background:var(--teal);color:#fff;white-space:nowrap}
+.btn:disabled{background:#C9CCCF;color:#F3F3F3;cursor:not-allowed}
+.btn.ghost{background:none;border:1px solid var(--teal);color:var(--teal)}
+.btn.navy{background:var(--navy)}
+.console{background:var(--navy);color:#E9EDF3;border-radius:12px;padding:12px 14px;font-size:14px;display:flex;flex-direction:column;gap:6px;min-height:52px}
+.console .empty{color:#8E9AB0;font-style:italic}
+.console .line{display:flex;gap:8px;align-items:flex-start}
+.console .ico{flex:none;width:18px;text-align:center}
+.console .ok .ico{color:#7FD1B9}
+.console .warn{color:#FFD9A8}
+.console .warn .ico{color:#F2A54A}
+.console .step{color:#8E9AB0;font-family:var(--mono);font-size:12.5px;margin-top:6px}
+.console pre{margin:0;font-family:var(--mono);font-size:12.5px;white-space:pre-wrap;word-break:break-all;color:#C9F0E3}
+.console .mono{font-family:var(--mono);font-size:12.5px;word-break:break-all}
+.footer-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+aside.system{display:flex;flex-direction:column;gap:14px;position:sticky;top:12px;min-width:0}
+aside.system h3{margin:0 0 8px;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.keys{display:flex;flex-wrap:wrap;gap:6px}
+.key{font-size:12.5px;border-radius:8px;padding:4px 8px;background:var(--teal-soft);color:var(--ink);border:1px solid #CFE2DB}
+.key b{font-weight:700}
+.key .fp{font-family:var(--mono);color:var(--muted)}
+.key.gone{background:var(--gray-soft);color:var(--gray);text-decoration:line-through;border-color:var(--line)}
+.key.wait{background:var(--amber-soft);border-color:#EBCF9F}
+.grid-wrap{overflow-x:auto}
+table.grid{border-collapse:collapse;width:100%;font-size:12.5px}
+table.grid th{font-weight:600;color:var(--muted);text-align:left;padding:4px 6px;font-size:11.5px;white-space:nowrap}
+table.grid td{padding:3px 4px}
+table.grid tr.focus td:first-child{font-weight:700;color:var(--ink)}
+table.grid tr.focus td{background:#FFF8E8}
+.cell{border-radius:6px;padding:3px 6px;white-space:nowrap;display:inline-block;min-width:96px}
+.k-plain{background:var(--red-soft);color:var(--red)}
+.k-ok{background:var(--teal-soft);color:var(--teal)}
+.k-dead{background:var(--gray-soft);color:var(--gray)}
+.k-orphan,.k-disabled{background:var(--amber-soft);color:var(--amber)}
+.k-absent,.k-none{color:#A4A7AD}
+.k-pseudo{background:var(--teal-soft);color:var(--teal)}
+.k-orphanlog{background:var(--gray-soft);color:var(--gray)}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:11.5px}
+.detail{display:flex;flex-direction:column;gap:8px}
+.dloc{font-size:12.5px}
+.dloc .fname{font-family:var(--mono);color:var(--muted);font-size:12px}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.chip{border-radius:6px;padding:2px 7px;font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip.tok{font-family:var(--mono)}
+.chip.k-dead{text-decoration:line-through}
+.panel-list{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.panel-list .mono{font-family:var(--mono);font-size:12px;word-break:break-all}
+.note{font-size:13px;color:var(--muted)}
+.welcome p{font-size:15.5px}
+.welcome ol{color:var(--body);padding-left:20px;margin:6px 0 10px}
+.welcome li{margin:4px 0}
+input.name{border:1px solid #CFCCC3;border-radius:10px;padding:9px 12px;width:min(380px,100%);background:#fff}
+.status-list{display:flex;flex-direction:column;gap:4px;font-size:14px}
+.status-list .row{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0}
+.status-list .yes{color:var(--teal);font-weight:600}
+.status-list .no{color:var(--amber);font-weight:600}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+@media (max-width:1180px){
+  .app{grid-template-columns:1fr}
+  nav{position:static;flex-direction:row;flex-wrap:wrap}
+  nav .group{display:none}
+  aside.system{position:static}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span>Data Privacy · Lab 3A</span>Crypto-Shredding: the VitaLink simulation</div>
+  <div class="who" id="who"></div>
+</header>
+<div class="app">
+  <nav id="nav"></nav>
+  <main id="main"></main>
+  <aside class="system" id="system"></aside>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   Scenario data (matches the lab slides 07-08)
+   ========================================================================= */
+const PATIENTS = [
+  {patient_id:"P001", name:"Anna Becker",     email:"anna.becker@mail.de",     zip:"10115", dob:"1985-03-12", sex:"F", diagnosis:"Asthma",                    clinic_region:"EU"},
+  {patient_id:"P002", name:"Luca Rossi",      email:"luca.rossi@mail.it",      zip:"20121", dob:"1972-11-02", sex:"M", diagnosis:"Hypertension",              clinic_region:"EU"},
+  {patient_id:"P003", name:"Sofia Lindqvist", email:"sofia.lindqvist@mail.se", zip:"11122", dob:"1990-07-24", sex:"F", diagnosis:"Major depressive disorder", clinic_region:"EU"},
+  {patient_id:"P004", name:"James Carter",    email:"james.carter@mail.com",   zip:"02139", dob:"1968-01-30", sex:"M", diagnosis:"Asthma",                    clinic_region:"US"},
+  {patient_id:"P005", name:"Maria Lopez",     email:"maria.lopez@mail.com",    zip:"90012", dob:"1995-05-17", sex:"F", diagnosis:"Type 2 diabetes",           clinic_region:"US"},
+  {patient_id:"P006", name:"David Kim",       email:"david.kim@mail.com",      zip:"60601", dob:"1980-09-09", sex:"M", diagnosis:"Migraine",                  clinic_region:"US"},
+];
+const PIDS = PATIENTS.map(p => p.patient_id);
+const P = id => PATIENTS.find(p => p.patient_id === id);
+const FIELDS = ["patient_id","name","email","zip","dob","sex","diagnosis","clinic_region"];
+const SIX = ["name","email","zip","dob","sex","diagnosis"];
+const LOCS = [
+  {id:"primary", file:"patients.csv",              short:"patients.csv",  fields:FIELDS},
+  {id:"backup1", file:"backups/snapshot_day1.csv", short:"snapshot_day1", fields:FIELDS},
+  {id:"backup2", file:"backups/snapshot_day2.csv", short:"snapshot_day2", fields:FIELDS},
+  {id:"index",   file:"search_index.json",         short:"search_index",  fields:["patient_id","name","diagnosis"]},
+  {id:"audit",   file:"audit_log.jsonl",           short:"audit_log",     fields:["patient_id"]},
+];
+const DIAG_LOCS = ["primary","backup1","backup2","index"];
+const ACCESSES = [["dr_weber","P001"],["dr_weber","P003"],["nurse_li","P004"],["dr_weber","P003"],["dr_hale","P006"]];
+const FOCUS = "P003";
+
+/* =========================================================================
+   Byte helpers, SHA-256 and HMAC (self-contained, works offline)
+   ========================================================================= */
+const utf8 = new TextEncoder();
+function randBytes(n){ const b = new Uint8Array(n); crypto.getRandomValues(b); return b; }
+function concat(...parts){ const len = parts.reduce((a,p)=>a+p.length,0); const out = new Uint8Array(len); let o=0; for(const p of parts){ out.set(p,o); o+=p.length; } return out; }
+function b64url(bytes){ let s=""; for(const x of bytes) s+=String.fromCharCode(x); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_"); }
+function unb64url(str){ const s = atob(str.replace(/-/g,"+").replace(/_/g,"/")); return Uint8Array.from(s, c => c.charCodeAt(0)); }
+function hex(bytes){ return Array.from(bytes, b => b.toString(16).padStart(2,"0")).join(""); }
+function isPrime(n){ for(let i=2;i*i<=n;i++) if(n%i===0) return false; return true; }
+function firstPrimes(count){ const out=[]; for(let n=2; out.length<count; n++) if(isPrime(n)) out.push(n); return out; }
+const SHA_K = firstPrimes(64).map(p => Math.floor((Math.cbrt(p) % 1) * 4294967296) >>> 0);
+const SHA_H = firstPrimes(8).map(p => Math.floor((Math.sqrt(p) % 1) * 4294967296) >>> 0);
+function ror(x,n){ return (x>>>n) | (x<<(32-n)); }
+function sha256(msg){
+  const l = msg.length, padLen = ((l + 9 + 63) >> 6) << 6;
+  const m = new Uint8Array(padLen); m.set(msg); m[l] = 0x80;
+  const dv = new DataView(m.buffer);
+  dv.setUint32(padLen-8, Math.floor(l / 0x20000000)); dv.setUint32(padLen-4, (l << 3) >>> 0);
+  const H = SHA_H.slice(), w = new Uint32Array(64);
+  for(let o=0; o<padLen; o+=64){
+    for(let i=0;i<16;i++) w[i] = dv.getUint32(o + i*4);
+    for(let i=16;i<64;i++){
+      const a=w[i-15], b=w[i-2];
+      const s0 = ror(a,7) ^ ror(a,18) ^ (a>>>3), s1 = ror(b,17) ^ ror(b,19) ^ (b>>>10);
+      w[i] = (w[i-16] + s0 + w[i-7] + s1) >>> 0;
+    }
+    let [a,b,c,d,e,f,g,h] = H;
+    for(let i=0;i<64;i++){
+      const S1 = ror(e,6) ^ ror(e,11) ^ ror(e,25), ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + SHA_K[i] + w[i]) >>> 0;
+      const S0 = ror(a,2) ^ ror(a,13) ^ ror(a,22), mj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + mj) >>> 0;
+      h=g; g=f; f=e; e=(d+t1)>>>0; d=c; c=b; b=a; a=(t1+t2)>>>0;
+    }
+    H[0]=(H[0]+a)>>>0; H[1]=(H[1]+b)>>>0; H[2]=(H[2]+c)>>>0; H[3]=(H[3]+d)>>>0;
+    H[4]=(H[4]+e)>>>0; H[5]=(H[5]+f)>>>0; H[6]=(H[6]+g)>>>0; H[7]=(H[7]+h)>>>0;
+  }
+  const out = new Uint8Array(32), odv = new DataView(out.buffer);
+  H.forEach((x,i) => odv.setUint32(i*4, x));
+  return out;
+}
+function hmac(key, msg){
+  let k = key.length > 64 ? sha256(key) : key;
+  const block = new Uint8Array(64); block.set(k);
+  const ipad = block.map(b => b ^ 0x36), opad = block.map(b => b ^ 0x5c);
+  return sha256(concat(opad, sha256(concat(ipad, msg))));
+}
+const sha256hex = str => hex(sha256(utf8.encode(str)));
+const hmacHex = (key, str) => hex(hmac(typeof key === "string" ? utf8.encode(key) : key, utf8.encode(str)));
+
+/* Fernet-shaped tokens. Real Fernet layout: version(1) | timestamp(8) | IV(16) | ciphertext | HMAC(32).
+   The simulation never needs to decrypt: whether a token is readable is decided by whether its key exists. */
+function newKey(){ return b64url(randBytes(32)); }
+function makeToken(text){
+  const ctLen = (Math.floor(utf8.encode(text).length / 16) + 1) * 16;
+  const ts = new Uint8Array(8); new DataView(ts.buffer).setUint32(4, Math.floor(Date.now()/1000));
+  return b64url(concat(new Uint8Array([0x80]), ts, randBytes(16), randBytes(ctLen), randBytes(32)));
+}
+function tokenSeconds(token){ const b = unb64url(token), dv = new DataView(b.buffer); return dv.getUint32(1) * 4294967296 + dv.getUint32(5); }
+const fp = key => sha256hex(key).slice(0,16);
+const short = (tok, n=14) => tok.length > n ? tok.slice(0,n) + "…" : tok;
+
+/* =========================================================================
+   The simulated VitaLink system
+   ========================================================================= */
+function newSystem(opts = {}){
+  const s = {keyMode:null, keys:{}, regionKeys:{}, enc:[], tokens:{}, tokenKey:{}, rows:{},
+             audit:[], auditMode:"id", cache:null, pending:null, day:0, extra:{}, panel:null};
+  LOCS.forEach(l => s.rows[l.id] = PIDS.slice());
+  s.audit = ACCESSES.map(([actor,pid]) => ({actor, action:"read", patient_id:pid}));
+  if(opts.keys) makeKeys(s, opts.keys);
+  if(opts.enc) encryptFields(s, opts.enc);
+  return s;
+}
+function makeKeys(s, mode){
+  s.keyMode = mode; s.keys = {};
+  if(mode === "per") PIDS.forEach(pid => s.keys[pid] = newKey());
+  else { s.regionKeys = {EU:newKey(), US:newKey()}; PATIENTS.forEach(p => s.keys[p.patient_id] = s.regionKeys[p.clinic_region]); }
+}
+function encryptFields(s, fields){
+  s.enc = fields.slice();
+  PATIENTS.forEach(p => {
+    const pid = p.patient_id; s.tokens[pid] = {};
+    fields.forEach(f => s.tokens[pid][f] = makeToken(p[f]));
+    s.tokenKey[pid] = s.keys[pid];
+  });
+}
+function appKeys(s){
+  if(!s.pending) return s.keys;
+  const k = {}; for(const pid in s.keys) if(!(pid in s.pending)) k[pid] = s.keys[pid]; return k;
+}
+const keyAlive = (s, key) => !!key && Object.values(s.keys).includes(key);
+const canRead = (s, pid) => { const k = appKeys(s)[pid]; return !!k && k === s.tokenKey[pid]; };
+
+function cellState(s, loc, pid, f){
+  if(loc === "audit"){
+    if(f !== "patient_id") return {kind:"na"};
+    if(s.auditMode === "pseudo"){
+      if(!ACCESSES.some(a => a[1] === pid)) return {kind:"none"};
+      return {kind: keyAlive(s, s.tokenKey[pid]) ? "pseudo" : "orphanlog"};
+    }
+    return s.audit.some(l => l.patient_id === pid) ? {kind:"plain", value:pid} : {kind:"none"};
+  }
+  const L = LOCS.find(l => l.id === loc);
+  if(!L.fields.includes(f)) return {kind:"na"};
+  if(!s.rows[loc].includes(pid)) return {kind:"absent"};
+  if(s.enc.includes(f)){
+    const tok = s.tokens[pid][f];
+    if(canRead(s, pid)) return {kind:"ok", value:tok};
+    if(keyAlive(s, s.tokenKey[pid])) return {kind: (s.pending && pid in s.pending) ? "disabled" : "orphan", value:tok};
+    return {kind:"dead", value:tok};
+  }
+  return {kind:"plain", value:P(pid)[f]};
+}
+function exposure(s, pid){
+  const r = {};
+  LOCS.forEach(L => r[L.id] = L.fields.filter(f => cellState(s, L.id, pid, f).kind === "plain").length);
+  return r;
+}
+function readDiag(s, loc, pid){
+  const c = cellState(s, loc, pid, "diagnosis");
+  return (c.kind === "ok" || c.kind === "plain") ? P(pid).diagnosis : null;
+}
+function readCounts(s){
+  const c = {}; PIDS.forEach(pid => c[pid] = DIAG_LOCS.filter(l => readDiag(s, l, pid) === P(pid).diagnosis).length); return c;
+}
+function fileText(s, loc){
+  if(loc === "audit") return s.audit.map(l => JSON.stringify(l)).join("\n");
+  const L = LOCS.find(l => l.id === loc);
+  const rows = s.rows[loc].map(pid => {
+    const r = {}; L.fields.forEach(f => r[f] = s.enc.includes(f) ? s.tokens[pid][f] : P(pid)[f]);
+    if(loc === "index" && s.extra.bidx) r.name_bidx = s.extra.bidx[pid];
+    return r;
+  });
+  return loc === "index" ? JSON.stringify(rows) : rows.map(r => L.fields.map(f => r[f]).join(",")).join("\n");
+}
+function fileHashes(s){ const h = {}; LOCS.forEach(L => h[L.id] = sha256hex(fileText(s, L.id))); return h; }
+function searchName(s, name){
+  return s.rows.index.filter(pid => cellState(s, "index", pid, "name").kind === "plain" && P(pid).name === name);
+}
+function eqScan(r, arr){ return LOCS.every((L,i) => r[L.id] === arr[i]); }
+
+/* =========================================================================
+   Output helpers for the console
+   ========================================================================= */
+const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ok   = t => `<div class="line ok"><span class="ico">✓</span><span>${t}</span></div>`;
+const warn = t => `<div class="line warn"><span class="ico">⚠</span><span>${t}</span></div>`;
+const info = t => `<div class="line"><span class="ico">›</span><span>${t}</span></div>`;
+const pre  = t => `<pre>${esc(t)}</pre>`;
+const scanText = r => LOCS.map(L => `${L.short} <b>${r[L.id]}</b>`).join(" · ");
+
+/* =========================================================================
+   The exercises
+   ========================================================================= */
+const STEPS = [
+{
+  id:"p1", group:"Lab", nav:"1 · Naive delete", eyebrow:"Part 1 · 20 min", title:"The naive delete",
+  intro:"VitaLink keeps every patient in five files: the main database, two backups, a search index and an audit log. Patient P003, Sofia Lindqvist, has asked to be erased. A developer does the obvious thing and deletes her row from the main database.",
+  setup:() => newSystem(),
+  predict:"A developer erases P003 by deleting the row from patients.csv. How many of the five locations still expose P003, and which fields?",
+  actions:[
+    {label:"Scan all five files for P003's data", code:'exposure_scan("P003")', run:s => {
+      const r = exposure(s, FOCUS);
+      return [info(`Plaintext fields for P003: ${scanText(r)}`),
+              eqScan(r,[8,8,8,3,1]) ? ok("Checkpoint reached: 8, 8, 8, 3 and 1, as on the slide.") : info("This does not match the slide checkpoint.")];
+    }},
+    {label:"Delete P003's row from patients.csv", code:'naive_delete("P003")', run:s => {
+      s.rows.primary = s.rows.primary.filter(pid => pid !== FOCUS);
+      return [info(`Rows left in patients.csv: ${s.rows.primary.join(", ")}`),
+              info(`Plaintext fields for P003 now: ${scanText(exposure(s, FOCUS))}`)];
+    }},
+  ],
+  explains:["Why does a loop that deletes from every file still fail in a real system?",
+            "What does a clean scan prove, and not prove?"],
+},
+{
+  id:"p2", group:"Lab", nav:"2 · Per-patient keys", eyebrow:"Part 2 · 30 min", title:"Per-patient keys, encrypt at write",
+  intro:"New design: every patient gets their own encryption key, and the diagnosis is encrypted before it is written anywhere. Watch the key store on the right fill up and the diagnosis column change.",
+  setup:() => newSystem(),
+  predict:"Two patients share a diagnosis (P001 and P004 both have Asthma): are their ciphertexts equal? Is one value encrypted twice equal? Do token lengths differ by diagnosis?",
+  actions:[
+    {label:"Give each patient their own key", code:"generate_key_store(ids)", run:s => {
+      makeKeys(s, "per");
+      return [info(`Keys created: ${Object.keys(s.keys).length}. See the key store on the right.`)];
+    }},
+    {label:"Encrypt every diagnosis, then write all five files", code:'encrypt_field(key_store, pid, diagnosis)', run:s => {
+      encryptFields(s, ["diagnosis"]);
+      return [info(`P003's diagnosis as stored in patients.csv:<br><span class="mono">${s.tokens[FOCUS].diagnosis}</span>`)];
+    }},
+    {label:"Read every diagnosis from the four places it is stored", code:"read_patient(key_store, location, pid)", run:s => {
+      const total = Object.values(readCounts(s)).reduce((a,b)=>a+b,0);
+      return [info(`Correct reads: ${total} of 24`),
+              total === 24 ? ok("Checkpoint reached: all 24 reads, as on the slide.") : info("This does not match the slide checkpoint.")];
+    }},
+    {label:"Compare the ciphertexts", code:"compare tokens", run:s => {
+      const a = s.tokens.P001.diagnosis, b = s.tokens.P004.diagnosis;
+      const t1 = makeToken("Asthma"), t2 = makeToken("Asthma");
+      const lens = PATIENTS.map(p => `${String(s.tokens[p.patient_id].diagnosis.length).padStart(3)} chars  ${p.diagnosis} (${p.diagnosis.length} letters)`).join("\n");
+      return [info(`P001 Asthma: <span class="mono">${short(a,30)}</span><br>P004 Asthma: <span class="mono">${short(b,30)}</span><br>Equal? <b>${a === b ? "yes" : "no"}</b>`),
+              info(`"Asthma" encrypted twice with the same key:<br><span class="mono">${short(t1,30)}</span><br><span class="mono">${short(t2,30)}</span><br>Equal? <b>${t1 === t2 ? "yes" : "no"}</b>`),
+              info("Token length for each diagnosis:"), pre(lens)];
+    }},
+    {label:"Decode bytes 1 to 8 of P001's token, with no key", code:"base64 decode → bytes[1:9]", run:s => {
+      const tok = s.tokens.P001.diagnosis, bytes = unb64url(tok).slice(1,9), secs = tokenSeconds(tok);
+      return [info(`Bytes 1 to 8 (hex): <span class="mono">${hex(bytes)}</span>`),
+              info(`The same 8 bytes read as one whole number: <b>${secs}</b>`),
+              info(`For comparison, the current Unix time on this computer: <b>${Math.floor(Date.now()/1000)}</b>`)];
+    }},
+  ],
+  explains:["A token gives up one fact with no key at all. You decoded bytes 1 to 8: what could an attacker learn from it?",
+            "Look at the token lengths. What do they leak, and why?"],
+},
+{
+  id:"p3", group:"Lab", nav:"3 · Erase and verify", eyebrow:"Part 3 · 20 min", title:"Erase and verify",
+  intro:"Now the real crypto-shredding: destroy P003's key and touch nothing else. Then collect evidence. A file fingerprint (SHA-256 hash) lets you compare a file before and after.",
+  setup:() => newSystem({keys:"per", enc:["diagnosis"]}),
+  predict:"You delete P003's key and nothing else. What does read_patient return at each location? Does the hash of patients.csv change?",
+  actions:[
+    {label:"Fingerprint all five files (SHA-256)", code:"file_hashes()", run:s => {
+      s.extra.before = fileHashes(s);
+      return [info("Fingerprints before:"), pre(LOCS.map(L => `${L.short.padEnd(14)} ${s.extra.before[L.id].slice(0,32)}…`).join("\n"))];
+    }},
+    {label:"Destroy P003's key", code:'erase_patient(key_store, "P003")', run:s => {
+      delete s.keys[FOCUS];
+      return [info("P003's key removed from the key store.")];
+    }},
+    {label:"Read everything again and re-fingerprint the files", code:"read_patient(...) + file_hashes()", run:s => {
+      const after = fileHashes(s);
+      const reads = DIAG_LOCS.map(l => `${l.padEnd(9)} ${readDiag(s, l, FOCUS) ?? "None"}`).join("\n");
+      const copies = DIAG_LOCS.filter(l => s.rows[l].includes(FOCUS)).length;
+      return [info(`read_patient for P003 at each location:`), pre(reads),
+              info(`Copies of P003's encrypted diagnosis still in the files: ${copies}`),
+              info("Fingerprints after:"), pre(LOCS.map(L => `${L.short.padEnd(14)} ${after[L.id].slice(0,32)}…`).join("\n"))];
+    }},
+  ],
+  explains:["Matching hashes prove something to an auditor and leave something unproven. Name both.",
+            "DISCUSS: Four encrypted copies of P003's diagnosis are still on disk. Has it been erased? Argue it in 3 or 4 sentences, then name the two assumptions your answer depends on."],
+},
+{
+  id:"p4", group:"Lab", nav:"4 · Scope audit", eyebrow:"Part 4 · 30 min", title:"Scope audit",
+  intro:"Part 3 said P003 has 0 readable copies. Here you start from the exact system Part 3 left behind: same files, same key store, P003's key already destroyed.",
+  setup:() => { const s = newSystem({keys:"per", enc:["diagnosis"]}); delete s.keys[FOCUS]; return s; },
+  predict:"Part 3 reported 0 readable copies. Run the exposure scan on that same system. How many locations report P003 as exposed?",
+  actions:[
+    {label:"Run the exposure scan on the Part 3 system", code:'exposure_scan("P003")', run:s => {
+      return [info(`Plaintext fields for P003: ${scanText(exposure(s, FOCUS))}`)];
+    }},
+    {label:"Search the index for 'Sofia Lindqvist'", code:'search_index_by_name("Sofia Lindqvist")', run:s => {
+      return [info(`Result: [${searchName(s, "Sofia Lindqvist").join(", ")}]`)];
+    }},
+    {label:"Rebuild as version 2 (six fields encrypted), then destroy P003's key again", code:"write_locations(ks, SIX_FIELDS)", run:s => {
+      Object.assign(s, newSystem({keys:"per", enc:SIX})); delete s.keys[FOCUS];
+      const plain = FIELDS.filter(f => cellState(s, "primary", FOCUS, f).kind === "plain");
+      return [info(`Plaintext fields for P003: ${scanText(exposure(s, FOCUS))}`),
+              info(`Fields of P003 still in plaintext in patients.csv: ${plain.join(", ")}`)];
+    }},
+    {label:"Search the index again, for P003 and for a patient who was not erased", code:"search_index_by_name(...)", run:s => {
+      return [info(`'Sofia Lindqvist' → [${searchName(s, "Sofia Lindqvist").join(", ")}]`),
+              info(`'Anna Becker' (P001, not erased) → [${searchName(s, "Anna Becker").join(", ")}]`)];
+    }},
+  ],
+  explains:["Both reports are correct, so what did Part 3 measure?",
+            "What did version 2 cost?",
+            "Is a bare patient_id still personal data?"],
+},
+{
+  id:"p5a", group:"Lab", nav:"5A · Key backup", eyebrow:"Part 5A · Break it", title:"The key backup",
+  intro:"The key store is backed up every night, like any important system. A tombstone list records the IDs of erased patients. Run a restore and see what happens.",
+  setup:() => { const s = newSystem({keys:"per", enc:SIX}); s.extra.tomb = []; s.panel = panelBackup; return s; },
+  predict:"The key store is backed up nightly. You erase P003, then restore the backup. Can P003 be read?",
+  actions:[
+    {label:"Nightly backup of the key store", code:"backup = dict(key_store)", run:s => {
+      s.extra.backup = Object.assign({}, s.keys);
+      return [info(`Backup taken: ${Object.keys(s.extra.backup).join(", ")}`)];
+    }},
+    {label:"Erase P003 and add her to the tombstone list", code:'erase_patient(...); tombstones.add("P003")', run:s => {
+      delete s.keys[FOCUS]; s.extra.tomb.push(FOCUS);
+      return [info(`P003's key removed. Tombstones: [${s.extra.tomb.join(", ")}]`),
+              info(`read_patient("P003") returns: <b>${readDiag(s,"primary",FOCUS) ?? "None"}</b>`)];
+    }},
+    {label:"Disaster: restore the key store from last night's backup", code:"restore_kms(backup, set())", run:s => {
+      s.keys = Object.assign({}, s.extra.backup);
+      return [info(`Keys after restore: ${Object.keys(s.keys).join(", ")}`),
+              info(`read_patient("P003") returns: <b>${readDiag(s,"primary",FOCUS) ?? "None"}</b>`)];
+    }},
+    {label:"Restore again, this time skipping tombstoned IDs", code:"restore_kms(backup, tombstones)", run:s => {
+      s.keys = {}; for(const pid in s.extra.backup) if(!s.extra.tomb.includes(pid)) s.keys[pid] = s.extra.backup[pid];
+      return [info(`Keys after restore: ${Object.keys(s.keys).join(", ")}`),
+              info(`read_patient("P003") returns: <b>${readDiag(s,"primary",FOCUS) ?? "None"}</b>`),
+              info(`read_patient("P001") returns: <b>${readDiag(s,"primary","P001") ?? "None"}</b>`)];
+    }},
+  ],
+  explains:["Why does a tombstone list fix this, and where must the tombstone list itself be stored?"],
+},
+{
+  id:"p5b", group:"Lab", nav:"5B · Plaintext cache", eyebrow:"Part 5B · Break it", title:"The plaintext cache",
+  intro:"To be fast, the app keeps decrypted records in a cache. A clinician opened P003's record shortly before her erasure request arrived.",
+  setup:() => { const s = newSystem({keys:"per", enc:SIX}); s.cache = {}; s.panel = panelCache; return s; },
+  predict:"A clinician read P003 before the erasure and the app cached the result. After erasing, what does the next read return?",
+  actions:[
+    {label:"A clinician opens P003 and P001 (the app caches both)", code:"reader.read('primary', pid)", run:s => {
+      s.cache.P003 = P("P003").diagnosis; s.cache.P001 = P("P001").diagnosis;
+      return [info(`Cache now holds: ${Object.keys(s.cache).join(", ")}`)];
+    }},
+    {label:"Erase P003", code:'erase_patient(key_store, "P003")', run:s => {
+      delete s.keys[FOCUS];
+      return [info("P003's key removed from the key store.")];
+    }},
+    {label:"The app reads P003 again", code:"reader.read('primary', 'P003')", run:s => {
+      return [info(`reader.read("P003") returns: <b>${s.cache.P003 ?? readDiag(s,"primary",FOCUS) ?? "None"}</b>`)];
+    }},
+    {label:"Invalidate P003 in the cache, then read again", code:"reader.invalidate('P003')", run:s => {
+      delete s.cache.P003;
+      return [info(`reader.read("P003") returns: <b>${s.cache.P003 ?? readDiag(s,"primary",FOCUS) ?? "None"}</b>`),
+              info(`Cache now holds: ${Object.keys(s.cache).join(", ") || "nothing"}`)];
+    }},
+  ],
+  explains:["The cache stands in for other places plaintext escapes. Name two more, and say how each would be repaired."],
+},
+{
+  id:"p5c", group:"Lab", nav:"5C · Shared key", eyebrow:"Part 5C · Break it", title:"The shared key",
+  intro:"A cheaper design: one key per clinic region instead of one per patient. All three EU patients are encrypted with the EU key. Erase P003 the only way this design allows.",
+  setup:() => newSystem({keys:"shared", enc:SIX}),
+  predict:"VitaLink uses one key per clinic region. To erase P003, how many patients must lose their data?",
+  actions:[
+    {label:"Delete P003's entry from the key store", code:'del key_store["P003"]', run:s => {
+      delete s.keys[FOCUS];
+      return [info("P003's entry removed from the key store.")];
+    }},
+    {label:"Try P001's key on P003's record", code:'Fernet(key_store["P001"]).decrypt(P003 token)', run:s => {
+      const works = s.keys.P001 === s.tokenKey[FOCUS];
+      return [info(`Result: <b>${works ? P(FOCUS).diagnosis : "InvalidToken"}</b>`)];
+    }},
+    {label:"Destroy the EU key itself", code:"erase_shared(key_store, 'P003')", run:s => {
+      const euKey = s.regionKeys.EU;
+      PIDS.filter(pid => s.keys[pid] === euKey).forEach(pid => delete s.keys[pid]);
+      const c = readCounts(s);
+      return [info("EU key destroyed."),
+              info(`Patients now unreadable everywhere: ${PIDS.filter(p => c[p] === 0).join(", ")}`)];
+    }},
+  ],
+  explains:["Why is deleting P003's entry from the key store not an erasure in this design?",
+            "What does this tell you about choosing the granularity of keys?"],
+},
+{
+  id:"p6", group:"Lab", nav:"6 · Erasure receipt", eyebrow:"Part 6 · 15 min", title:"Erasure receipt",
+  intro:"An auditor will ask you to prove the erasure happened. You write a receipt to the erasure log. Its subject_ref field says who the receipt is about.",
+  setup:() => { const s = newSystem({keys:"per", enc:SIX}); s.extra.secret = b64url(randBytes(32)); s.extra.log = []; s.panel = panelLog; return s; },
+  predict:"Which subject_ref proves the erasure without exposing who was erased: the ID itself, a plain hash of the ID, or an HMAC (a hash with a secret key)?",
+  actions:[
+    {label:"Show the three subject_ref options for P003", code:"subject_ref options", run:s => {
+      return [info(`ID: <span class="mono">${FOCUS}</span>`),
+              info(`sha256(ID): <span class="mono">${sha256hex(FOCUS)}</span>`),
+              info(`HMAC(secret, ID): <span class="mono">${hmacHex(s.extra.secret, FOCUS)}</span>`)];
+    }},
+    {label:"Guessing attack: try P001 to P999 against each option, without the secret", code:"for guess in P001..P999: compare", run:s => {
+      const attackerSecret = b64url(randBytes(32));
+      const attack = (target, f) => { for(let i=1;i<1000;i++){ const g = "P" + String(i).padStart(3,"0"); if(f(g) === target) return `match <b>${g}</b> after ${i} guesses`; } return "no match after 999 guesses"; };
+      return [info(`sha256(ID): ${attack(sha256hex(FOCUS), g => sha256hex(g))}`),
+              info(`HMAC(secret, ID): ${attack(hmacHex(s.extra.secret, FOCUS), g => hmacHex(attackerSecret, g))}`)];
+    }},
+    {label:"Fingerprint P003's key, then erase with a receipt", code:'erase_with_receipt(key_store, "P003", secret)', run:s => {
+      const keyFp = fp(s.keys[FOCUS]), before = fileHashes(s); delete s.keys[FOCUS];
+      const locations = DIAG_LOCS.filter(l => readDiag(s, l, FOCUS) === null), after = fileHashes(s);
+      const receipt = {subject_ref: hmacHex(s.extra.secret, FOCUS), erased_at: new Date().toISOString().slice(0,19) + "+00:00",
+        method:"crypto-shredding: per-subject key destroyed", key_fingerprint: keyFp,
+        locations, storage_unmodified: LOCS.every(L => before[L.id] === after[L.id])};
+      s.extra.log.push(receipt);
+      return [info("Receipt appended to erasure_log.jsonl:"), pre(JSON.stringify(receipt, null, 2))];
+    }},
+  ],
+  explains:["subject_ref can be the ID, a plain hash of it, or an HMAC. Which one did you choose, and why?",
+            "Why is a hash of a random key safe to publish, but a hash of a patient ID not?",
+            "To prove you forgot someone, you must remember something. What is the minimum to retain, and for how long?"],
+},
+{
+  id:"x1", group:"Extensions", nav:"X1 · Blind index", eyebrow:"Extension X1", title:"The blind index leak",
+  intro:"Version 2 broke name search. A blind index brings it back: the index stores a keyed hash (HMAC) of each name, and a search hashes the query the same way, so names are never stored. The index key is shared, not per patient.",
+  setup:() => { const s = newSystem({keys:"per", enc:SIX}); s.extra.ikey = b64url(randBytes(32)); s.extra.bidx = {};
+                PATIENTS.forEach(p => s.extra.bidx[p.patient_id] = hmacHex(s.extra.ikey, p.name.trim().toLowerCase())); s.panel = panelIndex; return s; },
+  predict:"The index now stores a blind index (keyed hash) of each name so it can be searched. After P003's key is destroyed, does a search for 'Sofia Lindqvist' still match?",
+  actions:[
+    {label:"Search the blind index for '  sofia LINDQVIST '", code:"blind_index(index_key, query)", run:s => {
+      return [info(`Result: [${bidxSearch(s, "  sofia LINDQVIST ").join(", ")}]`)];
+    }},
+    {label:"Erase P003", code:'erase_patient(key_store, "P003")', run:s => { delete s.keys[FOCUS]; return [info("P003's key removed from the key store.")]; }},
+    {label:"Search again for 'Sofia Lindqvist'", code:"blind_index(index_key, query)", run:s => {
+      return [info(`Result: [${bidxSearch(s, "Sofia Lindqvist").join(", ")}]`)];
+    }},
+    {label:"Purge P003's index entry, then search again", code:'purge_index_entry("P003")', run:s => {
+      s.rows.index = s.rows.index.filter(pid => pid !== FOCUS);
+      return [info(`'Sofia Lindqvist' → [${bidxSearch(s,"Sofia Lindqvist").join(", ")}]`),
+              info(`'Anna Becker' → [${bidxSearch(s,"Anna Becker").join(", ")}]`)];
+    }},
+  ],
+  explains:["Why doesn't crypto-shredding reach the blind index?",
+            "Why is deleting the index entry acceptable here, when deleting from the backups was not?"],
+},
+{
+  id:"x2", group:"Extensions", nav:"X2 · Audit trail", eyebrow:"Extension X2", title:"Shred the audit trail",
+  intro:"The audit log can't be edited: it is evidence. So instead of patient_id, each line stores a pseudonym made from the patient's own key: HMAC(patient key, \"audit-log\"). To find a patient's lines, you compute their pseudonym and search for it.",
+  setup:() => { const s = newSystem({keys:"per", enc:SIX}); s.auditMode = "pseudo";
+                s.audit = ACCESSES.map(([actor,pid]) => ({actor, action:"read", subject: auditRef(s, pid)})); s.panel = panelAudit; return s; },
+  predict:"The audit log stores a pseudonym made from each patient's own key. After P003's key is destroyed, can anyone list P003's accesses? Does the log file change?",
+  actions:[
+    {label:"List P003's accesses", code:'find_accesses(key_store, "P003")', run:s => {
+      return [info(`P003's pseudonym: <span class="mono">${auditRef(s, FOCUS)}</span>`),
+              info(`Lines found: ${findAccesses(s, FOCUS).map(l => l.actor).join(", ")}`)];
+    }},
+    {label:"Fingerprint the audit log, then erase P003", code:'erase_patient(key_store, "P003")', run:s => {
+      s.extra.auditHash = sha256hex(fileText(s, "audit")); delete s.keys[FOCUS];
+      return [info(`audit_log fingerprint: <span class="mono">${s.extra.auditHash.slice(0,32)}…</span>`), info("P003's key removed from the key store.")];
+    }},
+    {label:"List P003's accesses again, and re-fingerprint the log", code:'find_accesses(key_store, "P003")', run:s => {
+      return [info(`Lines found for P003: [${findAccesses(s, FOCUS).join(", ")}]`),
+              info(`audit_log fingerprint: <span class="mono">${sha256hex(fileText(s,"audit")).slice(0,32)}…</span> (${s.audit.length} lines)`),
+              info(`Lines found for P001: ${findAccesses(s,"P001").length}`)];
+    }},
+  ],
+  explains:["What could still re-link those orphaned lines to P003?",
+            "Why is it useful that the audit log never had to be edited?"],
+},
+{
+  id:"x3", group:"Extensions", nav:"X3 · Scheduled deletion", eyebrow:"Extension X3", title:"Scheduled key deletion",
+  intro:"Real key management services (AWS KMS, Azure Key Vault) never destroy a key instantly. They disable it and wait 7 to 30 days before destroying it. The vault panel on the right shows each key's status and the day.",
+  setup:() => { const s = newSystem({keys:"per", enc:SIX}); s.pending = {}; s.day = 0; s.panel = panelVault; return s; },
+  predict:"Real KMSs wait 7 to 30 days before destroying a key. On day 3 of the wait, is P003 erased?",
+  actions:[
+    {label:"Schedule deletion of P003's key (7-day wait)", code:'vault.schedule_deletion("P003", 7)', run:s => {
+      s.pending[FOCUS] = 7;
+      return [info(`Day ${s.day}: read_patient("P003") returns <b>${readDiag(s,"primary",FOCUS) ?? "None"}</b>`)];
+    }},
+    {label:"Cancel the deletion", code:'vault.cancel_deletion("P003")', run:s => {
+      delete s.pending[FOCUS];
+      return [info(`cancel_deletion returned <b>True</b>. read_patient("P003") returns <b>${readDiag(s,"primary",FOCUS) ?? "None"}</b>`)];
+    }},
+    {label:"Schedule again, then let 3 days pass", code:"vault.advance(3)", run:s => {
+      s.pending[FOCUS] = 7; advance(s, 3);
+      return [info(`Day ${s.day}: P003's key is disabled, ${s.pending[FOCUS]} days left`)];
+    }},
+    {label:"Let 4 more days pass", code:"vault.advance(4)", run:s => {
+      return [info(`Day ${s.day + 4}: keys destroyed today: [${advance(s, 4).join(", ")}]`)];
+    }},
+    {label:"Try to cancel now", code:'vault.cancel_deletion("P003")', run:s => {
+      return [info(`cancel_deletion returned <b>False</b>. read_patient("P003") returns <b>${readDiag(s,"primary",FOCUS) ?? "None"}</b>`)];
+    }},
+  ],
+  explains:["When is the erasure complete, and which date belongs in the receipt?",
+            "GDPR says erase 'without undue delay'. Is a 7-day waiting period defensible? Argue it."],
+},
+];
+
+function bidxSearch(s, name){ const t = hmacHex(s.extra.ikey, name.trim().toLowerCase()); return s.rows.index.filter(pid => s.extra.bidx[pid] === t); }
+function auditRef(s, pid){ return hmacHex(s.keys[pid], "audit-log").slice(0,16); }
+function findAccesses(s, pid){ if(!(pid in s.keys)) return []; const r = auditRef(s, pid); return s.audit.filter(l => l.subject === r); }
+function advance(s, days){
+  s.day += days; const gone = [];
+  for(const pid of Object.keys(s.pending)){ s.pending[pid] -= days; if(s.pending[pid] <= 0){ delete s.pending[pid]; delete s.keys[pid]; gone.push(pid); } }
+  return gone;
+}
+
+/* Step-specific side panels */
+function panelBackup(s){
+  const b = s.extra.backup;
+  return `<h3>Key-store backup and tombstones</h3><div class="panel-list">
+    <div>Nightly backup: ${b ? Object.keys(b).map(p => `<span class="key"><b>${p}</b></span>`).join(" ") : '<span class="note">not taken yet</span>'}</div>
+    <div>Tombstones (erased IDs): ${s.extra.tomb.length ? s.extra.tomb.map(p => `<b>${p}</b>`).join(", ") : '<span class="note">none</span>'}</div></div>`;
+}
+function panelCache(s){
+  const e = Object.entries(s.cache);
+  return `<h3>App cache (decrypted values)</h3><div class="panel-list">${e.length ? e.map(([p,v]) => `<div><b>${p}</b> → <span class="cell k-plain">${esc(v)}</span></div>`).join("") : '<span class="note">empty</span>'}</div>`;
+}
+function panelLog(s){
+  return `<h3>erasure_log.jsonl</h3><div class="panel-list">${s.extra.log.length ? s.extra.log.map(r => `<div class="mono">${esc(JSON.stringify(r))}</div>`).join("") : '<span class="note">empty</span>'}</div>`;
+}
+function panelIndex(s){
+  return `<h3>search_index.json · name_bidx column</h3><div class="panel-list">${s.rows.index.map(p => `<div><b>${p}</b> <span class="mono">${s.extra.bidx[p].slice(0,28)}…</span></div>`).join("")}</div>`;
+}
+function panelAudit(s){
+  return `<h3>audit_log.jsonl</h3><div class="panel-list">${s.audit.map(l => {
+    const owner = PIDS.find(pid => pid in s.keys && auditRef(s,pid) === l.subject);
+    return `<div class="mono">{"actor": "${l.actor}", "subject": "${l.subject}"} <span class="note">${owner ? "→ " + owner : "→ no match"}</span></div>`;
+  }).join("")}</div>`;
+}
+function panelVault(s){
+  return `<h3>KMS vault · day ${s.day}</h3><div class="panel-list">${PIDS.map(pid => {
+    const st = !(pid in s.keys) ? '<span class="cell k-dead">destroyed</span>' : (pid in s.pending ? `<span class="cell k-disabled">disabled, ${s.pending[pid]} days left</span>` : '<span class="cell k-ok">active</span>');
+    return `<div><b>${pid}</b> ${st}</div>`;
+  }).join("")}</div>`;
+}
+
+/* =========================================================================
+   Saved answers (kept in this browser on this computer)
+   ========================================================================= */
+const STORE_KEY = "lab3a-crypto-shredding-answers-v1";
+let store = {name:"", answers:{}};
+try { const raw = localStorage.getItem(STORE_KEY); if(raw) store = Object.assign(store, JSON.parse(raw)); } catch(e) {}
+function save(){ try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch(e) {} }
+function ans(id){ return store.answers[id] || (store.answers[id] = {predict:"", locked:false, explains:[], ran:false}); }
+const MIN = 15;
+const filled = t => (t || "").trim().length >= MIN;
+function stepStatus(st){
+  const a = store.answers[st.id]; if(!a) return "";
+  if(a.ran && filled(a.predict) && st.explains.every((_,i) => filled(a.explains[i]))) return "done";
+  return (a.predict || a.ran) ? "started" : "";
+}
+
+/* =========================================================================
+   Rendering
+   ========================================================================= */
+let current = "start", sys = null, ran = 0, output = [];
+const $ = id => document.getElementById(id);
+
+function renderNav(){
+  let html = `<button data-go="start" class="${current==="start"?"active":""}"><span class="dot ${store.name?"done":""}"></span>Start here</button>`;
+  let group = "";
+  STEPS.forEach(st => {
+    if(st.group !== group){ group = st.group; html += `<div class="group">${group === "Lab" ? "The lab" : "Extra exercises"}</div>`; }
+    html += `<button data-go="${st.id}" class="${current===st.id?"active":""}"><span class="dot ${stepStatus(st)}"></span>${st.nav}</button>`;
+  });
+  html += `<div class="group">Finish</div><button data-go="finish" class="${current==="finish"?"active":""}"><span class="dot"></span>Hand in answers</button>`;
+  $("nav").innerHTML = html;
+  $("nav").querySelectorAll("button").forEach(b => b.onclick = () => go(b.dataset.go));
+  $("who").textContent = store.name ? `Student: ${store.name}` : "";
+}
+
+function go(id){
+  current = id; ran = 0; output = [];
+  const st = STEPS.find(s => s.id === id);
+  sys = st ? st.setup() : null;
+  render(); window.scrollTo(0,0);
+}
+
+function render(){
+  renderNav();
+  if(current === "start") return renderStart();
+  if(current === "finish") return renderFinish();
+  renderStep(); renderSystem();
+}
+
+function renderStart(){
+  $("system").innerHTML = "";
+  $("main").innerHTML = `<div class="card welcome">
+    <div class="eyebrow">Lab 3A · Crypto-Shredding</div>
+    <h1>Erase a patient by destroying one key</h1>
+    <p>VitaLink is a fictional telehealth platform. Patient <b>P003, Sofia Lindqvist</b>, has asked to be erased. Your job is to make that true, prove it, find what it missed, and then break it.</p>
+    <p><b>How every part works</b></p>
+    <ol>
+      <li><b>Predict</b>: before anything runs, write what you think will happen. It is marked on reasoning, not on being right.</li>
+      <li><b>Run</b>: click the actions one by one. The panel on the right shows the five files and the key store changing.</li>
+      <li><b>Explain</b>: write what you saw and why, especially where it differed from your prediction.</li>
+    </ol>
+    <p>Your prediction locks once you run the first action. Answers are kept in this browser on this computer, but <b>copy them into Notepad at the end of each part</b> to be safe.</p>
+    <p class="note">This is a simulation that runs entirely in your browser. Keys, tokens and hashes behave like the Python Fernet code in the lab.</p>
+    <div style="border-left:6px solid var(--teal);background:var(--teal-soft);border-radius:10px;padding:12px 16px;margin:10px 0">
+      <p style="margin:0 0 4px"><b>Your data in this lab</b></p>
+      <p style="margin:0">Nothing you type is sent anywhere. Your name and answers stay in this browser, on this computer, so you can carry on if the page closes. You hand them in yourself at the end, using <b>Hand in answers</b>.</p>
+    </div>
+    <p class="q">Your full name</p>
+    <input class="name" id="name" placeholder="First and last name" value="${esc(store.name)}">
+    <div class="btnrow"><button class="btn" id="begin">Start Part 1</button></div>
+  </div>`;
+  $("name").oninput = e => { store.name = e.target.value; save(); renderNav(); };
+  $("begin").onclick = () => go("p1");
+}
+
+function renderStep(){
+  const st = STEPS.find(s => s.id === current), a = ans(st.id);
+  const idx = STEPS.indexOf(st), next = STEPS[idx+1] ? STEPS[idx+1].id : "finish";
+  $("main").innerHTML = `
+    <div class="card">
+      <div class="eyebrow">${st.eyebrow}</div>
+      <h1>${st.title}</h1>
+      <p>${st.intro}</p>
+    </div>
+    <div class="card">
+      <h2><span class="pill predict">Predict</span> Write it down first</h2>
+      <p class="q">${st.predict}</p>
+      <textarea id="predict" placeholder="Your prediction, in one to three sentences…">${esc(a.predict)}</textarea>
+      <div id="predictNote"></div>
+    </div>
+    <div class="card">
+      <h2><span class="pill run">Run</span> Click the actions in order</h2>
+      <div class="actions" id="actions"></div>
+      <div style="height:12px"></div>
+      <div class="console" id="console"></div>
+    </div>
+    <div class="card">
+      <h2><span class="pill explain">Explain</span> Say what you saw</h2>
+      ${st.explains.map((q,i) => `<p class="q">${i+1}. ${q}</p><textarea data-ex="${i}" placeholder="Two to five sentences…">${esc(a.explains[i]||"")}</textarea>`).join("")}
+      <div id="explainNote" class="hint"></div>
+    </div>
+    <div class="footer-row">
+      <span class="note">Answers save automatically as you type.</span>
+      <button class="btn navy" id="next">Save and continue →</button>
+    </div>`;
+  $("predict").oninput = e => { a.predict = e.target.value; save(); renderActions(); renderNav(); };
+  document.querySelectorAll("textarea[data-ex]").forEach(t => t.oninput = e => { a.explains[+t.dataset.ex] = e.target.value; save(); renderNav(); });
+  $("next").onclick = () => go(next);
+  renderActions(); renderConsole();
+}
+
+function renderActions(){
+  const st = STEPS.find(s => s.id === current), a = ans(st.id);
+  const canStart = a.locked || filled(a.predict);
+  $("predict").disabled = a.locked;
+  $("predictNote").innerHTML = a.locked ? `<div class="locked">🔒 Prediction locked. It stays as you wrote it, even if it was wrong.</div>`
+                                        : `<div class="hint">Write at least one full sentence to unlock the actions. Wrong predictions are fine.</div>`;
+  $("actions").innerHTML = st.actions.map((act,i) => `
+    <div class="act ${i < ran ? "done" : ""}">
+      <span class="n">${i < ran ? "✓" : i+1}</span>
+      <div class="lbl">${act.label}<code>${esc(act.code)}</code></div>
+      <button class="btn" data-act="${i}" ${(i !== ran || !canStart) ? "disabled" : ""}>${i < ran ? "Done" : "Run"}</button>
+    </div>`).join("");
+  $("actions").querySelectorAll("button[data-act]").forEach(b => b.onclick = () => runAction(+b.dataset.act));
+  const allRan = ran >= st.actions.length || a.ran;
+  document.querySelectorAll("textarea[data-ex]").forEach(t => t.disabled = !allRan);
+  $("explainNote").textContent = allRan ? "" : "These unlock after you have run every action.";
+}
+
+function runAction(i){
+  const st = STEPS.find(s => s.id === current), a = ans(st.id);
+  if(i === 0){ a.locked = true; }
+  output.push(`<div class="step">› ${esc(st.actions[i].code)}</div>`, ...st.actions[i].run(sys));
+  ran = i + 1;
+  if(ran >= st.actions.length) a.ran = true;
+  save(); renderActions(); renderConsole(); renderSystem(); renderNav();
+}
+
+function renderConsole(){
+  $("console").innerHTML = output.length ? output.join("") : `<span class="empty">Output appears here when you run an action.</span>`;
+}
+
+const LABEL = {plain:"👁 plaintext", ok:"🔓 readable", dead:"🔒 unreadable", orphan:"🔒 no key entry", disabled:"⏸ key disabled",
+               absent:"— row deleted", none:"·", pseudo:"🔓 pseudonym", orphanlog:"🔒 pseudonym"};
+
+function renderSystem(){
+  const s = sys;
+  let keys;
+  if(!s.keyMode) keys = `<span class="note">No keys yet. Everything is stored in plaintext.</span>`;
+  else if(s.keyMode === "shared"){
+    keys = ["EU","US"].map(r => {
+      const k = s.regionKeys[r], alive = keyAlive(s, k), users = PIDS.filter(pid => s.keys[pid] === k);
+      return `<span class="key ${alive ? "" : "gone"}"><b>${r} key</b> <span class="fp">${fp(k).slice(0,10)}</span> · entries: ${users.join(", ") || "none"}</span>`;
+    }).join("");
+  } else {
+    keys = PIDS.map(pid => {
+      if(!(pid in s.keys)) return `<span class="key gone"><b>${pid}</b> destroyed</span>`;
+      if(s.pending && pid in s.pending) return `<span class="key wait"><b>${pid}</b> ⏳ ${s.pending[pid]}d</span>`;
+      return `<span class="key"><b>${pid}</b> <span class="fp">${fp(s.keys[pid]).slice(0,10)}</span></span>`;
+    }).join("");
+  }
+  const head = `<tr><th>Patient</th>${LOCS.map(L => `<th title="${L.file}">${L.short}</th>`).join("")}</tr>`;
+  const rows = PIDS.map(pid => `<tr class="${pid===FOCUS?"focus":""}"><td>${pid}</td>${LOCS.map(L => {
+    const c = cellState(s, L.id, pid, L.id === "audit" ? "patient_id" : "diagnosis");
+    return `<td><span class="cell k-${c.kind}">${LABEL[c.kind] || ""}</span></td>`;
+  }).join("")}</tr>`).join("");
+  const detail = LOCS.map(L => {
+    let chips;
+    if(L.id === "audit"){
+      const c = cellState(s, "audit", FOCUS, "patient_id");
+      const n = ACCESSES.filter(x => x[1] === FOCUS).length;
+      chips = c.kind === "plain" ? `<span class="chip k-plain">patient_id: P003 (${n} lines)</span>`
+            : `<span class="chip k-${c.kind}">${c.kind === "pseudo" ? "pseudonym (her key exists)" : "pseudonym (her key is gone)"} (${n} lines)</span>`;
+    } else if(!s.rows[L.id].includes(FOCUS)) chips = `<span class="chip k-absent">row deleted</span>`;
+    else chips = L.fields.map(f => {
+      const c = cellState(s, L.id, FOCUS, f);
+      return c.kind === "plain" ? `<span class="chip k-plain">${f}: ${esc(c.value)}</span>`
+                                : `<span class="chip tok k-${c.kind}" title="${c.value}">${f}: ${short(c.value, 12)}</span>`;
+    }).join("");
+    return `<div class="dloc"><span class="fname">${L.file}</span><div class="chips">${chips}</div></div>`;
+  }).join("");
+  const scan = exposure(s, FOCUS);
+  const hideDetail = ["p2","p3"].includes(current);   // Part 4 asks students to predict this
+  $("system").innerHTML = `
+    <div class="card"><h3>Key store</h3><div class="keys">${keys}</div></div>
+    <div class="card"><h3>The five files · diagnosis per patient</h3>
+      <div class="grid-wrap"><table class="grid">${head}${rows}</table></div>
+      <div class="legend"><span class="cell k-plain">👁 plaintext</span><span class="cell k-ok">🔓 readable</span><span class="cell k-dead">🔒 unreadable</span><span class="cell k-orphan">🔒 no key entry</span></div>
+      <p class="note" style="margin-top:6px">audit_log stores no diagnosis; that column shows whether P00x's ID appears in it.</p></div>
+    ${hideDetail ? "" : `<div class="card"><h3>P003 in each file · plaintext fields: ${LOCS.map(L => scan[L.id]).join(", ")}</h3><div class="detail">${detail}</div></div>`}
+    ${s.panel ? `<div class="card">${s.panel(s)}</div>` : ""}`;
+}
+
+function answersText(){
+  const lines = ["Lab 3A - Crypto-Shredding: answers", `Name: ${store.name || "(not given)"}`, `Saved: ${new Date().toLocaleString()}`, ""];
+  STEPS.forEach(st => {
+    const a = store.answers[st.id] || {explains:[]};
+    lines.push("=".repeat(60), `${st.eyebrow}: ${st.title}`, "=".repeat(60));
+    lines.push(`PREDICT: ${st.predict}`, `> ${(a.predict || "").trim() || "(no answer)"}`, "");
+    st.explains.forEach((q,i) => lines.push(`EXPLAIN ${i+1}: ${q}`, `> ${((a.explains||[])[i] || "").trim() || "(no answer)"}`, ""));
+    lines.push(`Actions completed: ${a.ran ? "yes" : "no"}`, "");
+  });
+  return lines.join("\r\n");
+}
+
+function renderFinish(){
+  $("system").innerHTML = "";
+  const rows = STEPS.map(st => {
+    const s = stepStatus(st);
+    return `<div class="row"><span>${st.eyebrow}: ${st.title}</span><span class="${s==="done"?"yes":"no"}">${s==="done"?"complete":(s?"in progress":"not started")}</span></div>`;
+  }).join("");
+  $("main").innerHTML = `<div class="card">
+    <div class="eyebrow">Finish</div><h1>Hand in your answers</h1>
+    <p>Check your name, then copy your answers into Notepad and save the file as <b>Lab3A_YourName.txt</b>. Or download the text file directly.</p>
+    <p class="q">Your full name</p><input class="name" id="name2" value="${esc(store.name)}" placeholder="First and last name">
+    <div class="btnrow"><button class="btn" id="copy">Copy all my answers</button><button class="btn ghost" id="dl">Download as .txt</button></div>
+    <div class="status-list">${rows}</div>
+    <p class="q" style="margin-top:14px">Everything you wrote (you can also select it and press Ctrl+C):</p>
+    <textarea id="all" style="min-height:280px;font-family:var(--mono);font-size:13px" readonly></textarea>
+  </div>`;
+  $("all").value = answersText();
+  $("name2").oninput = e => { store.name = e.target.value; save(); renderNav(); $("all").value = answersText(); };
+  $("copy").onclick = copyAll;
+  $("dl").onclick = () => {
+    const blob = new Blob([answersText()], {type:"text/plain"}), a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `Lab3A_${(store.name || "answers").replace(/[^A-Za-z0-9]+/g,"_")}.txt`;
+    document.body.appendChild(a); a.click(); a.remove(); toast("Downloaded. Check your Downloads folder.");
+  };
+}
+
+function copyAll(){
+  const t = $("all"); t.value = answersText();
+  const fallback = () => { t.focus(); t.select(); let done = false; try { done = document.execCommand("copy"); } catch(e) {}
+    toast(done ? "Copied. Paste it into Notepad with Ctrl+V." : "Select the text below and press Ctrl+C."); };
+  if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t.value).then(() => toast("Copied. Paste it into Notepad with Ctrl+V."), fallback);
+  else fallback();
+}
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 2600); }
+
+render();
+</script>
+</body>
+</html>
